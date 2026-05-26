@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="51ddc702-f96c-479c-9575-d4624dae75f3" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	
+    <!-- Main Flow -->
+    <flow name="statusFlow">
+
+        <http:listener 
+            path="/status"
+            config-ref="HTTP_Listener_config">
+			<http:response statusCode="#[vars.httpStatus]" />
+		</http:listener>
+
+        <choice doc:name="Check Query Param">
+
+            <!-- 200 OK -->
+            <when expression="#[attributes.queryParams.'type' == &quot;success&quot;]">
+
+                <set-payload value='#[output application/json --- {&#10;                    message: "Request processed successfully"&#10;                }]'/>
+
+                <set-variable variableName="httpStatus" value="200"/>
+
+            </when>
+
+            <!-- 400 BAD REQUEST -->
+            <when expression="#[attributes.queryParams.'type' == &quot;bad&quot;]">
+
+                <set-payload value='#[output application/json --- {&#10;                    error: "Wrong query parameter value"&#10;                }]'/>
+
+                <set-variable variableName="httpStatus" value="400"/>
+
+            </when>
+
+            <!-- 500 INTERNAL SERVER ERROR -->
+            <otherwise>
+
+                <set-payload value='#[output application/json --- {&#10;                    error: "Internal server error occurred"&#10;                }]'/>
+
+                <set-variable variableName="httpStatus" value="500"/>
+
+            </otherwise>
+
+        </choice>
+
+        <!-- Set HTTP Status -->
+        <ee:transform doc:name="Set Status Code">
+            <ee:message>
+                <ee:set-attributes><![CDATA[
+%dw 2.0
+output application/json
+---
+{
+    statusCode: vars.httpStatus
+}
+]]>
+                </ee:set-attributes>
+            </ee:message>
+        </ee:transform>
+
+    </flow>
+
+</mule>
+
